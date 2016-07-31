@@ -7,13 +7,32 @@
 ## Last update: Jul 12, 2016
 ## Now called md2jekyllDT5
 ##    only works with product name = mydoc
-##      prefixes pages with "mydoc_"
+##      prefixes pages with "mydoc_"    #this is now optional
 ##      sends output pages to /mydoc
 ##      expects and updates /_data/sidebars/mydoc_sidebar.yml
 ##      no longer creates url.yml
-## arguments mdfile="Rbasics.knit.md"; sidebartitle=NULL; sidebarpos=2; outfilebasename=NULL; outpath="../../mydoc"; sidebar_url_path="../../_data/sidebars/"; fenced2highlight=FALSE; image_dir=NULL
+## arguments mdfile="Rbasics.knit.md"; sidebartitle=NULL; sidebarpos=2; outfilebasename=NULL; outpath="../../mydoc/"; sidebar_url_path="../../_data/sidebars/"; fenced2highlight=FALSE; image_dir=NULL
 ## md2Jekyll("mdfile=Rbasics.knit.md", sidebarpos=2)
 md2Jekyll <- function(mdfile="Rbasics.knit.md", sidebartitle=NULL, sidebarpos, outfilebasename=NULL, outpath="./", sidebar_url_path="./", fenced2highlight=TRUE, image_dir=NULL) {
+    ## (0) OK to override parameters here and use this for singlestep
+#      mdfile <- "Rbasics.knit.md"
+#      sidebarpos <- 2
+    foldername <- "mydoc"                          #foldername is NOT YET implemented in this script
+                                                   #maybe it should be implemented to suport a blank foldername too
+                                                   #changing foldername also requires configuration changes in the site
+    outpath <- paste0("../../", foldername, "/")   #this path is relative to /_vignettes
+    sidebar_url_path="../../_data/sidebars/"       #this path is relative to /_vignettes
+
+    fenced2highlight=FALSE    
+    filenameprefix <- ''          #use '' for none, or use 'mydoc_'
+    v4stylepermalinks <- FALSE    #TRUE for v4style, use FALSE for v5style
+    if (v4stylepermalinks) {
+      permalinkterminator <- ".html"  #or use "/" for v5style
+      permalinknesting <- ""          #or use "../" for v5style, because it's another level deeper
+    } else {
+      permalinkterminator <- "/"  #or use "/" for v5style
+      permalinknesting <- "../"   #or use "../" for v5style, because it's another level deeper
+    }
     ## (1) Import md file 
   print("JDT 5.0")
     md <- readLines(mdfile)
@@ -104,7 +123,7 @@ md2Jekyll <- function(mdfile="Rbasics.knit.md", sidebartitle=NULL, sidebarpos, o
         image_dir2 <- gsub("^.*/", "", image_dir) # Note, image path is relative in html source
         newhtmlimgpath <- paste0(image_dir2, "/", gsub("^.*/", "", htmlimgpath))
         newhtmlimgpath <- paste0(gsub("(^.*?src=\").*", "\\1", htmlimgtag), 
-                                 "../", 
+                                 permalinknesting, #like "" or "../", 
                                  newhtmlimgpath, 
                                  gsub("^.*?src=\".*?(\".*)", "\\1", htmlimgtag))
         md[htmlimgindex] <- newhtmlimgpath
@@ -122,7 +141,7 @@ md2Jekyll <- function(mdfile="Rbasics.knit.md", sidebartitle=NULL, sidebarpos, o
         image_dir2 <- gsub("^.*/", "", image_dir) # Note, image path is relative in html source
         newmdimgpath <- paste0(image_dir2, "/", gsub("^.*/", "", mdimgpath))
         newmdimgpath <- paste0(gsub("(\\!\\[.*{0,}\\]\\().*", "\\1", mdimgtag),
-                               "../",
+                               permalinknesting, #like "" or "../", 
                                newmdimgpath,
                                ")")
         md[mdimgindex] <- newmdimgpath
@@ -168,7 +187,7 @@ md2Jekyll <- function(mdfile="Rbasics.knit.md", sidebartitle=NULL, sidebarpos, o
     } else {
       outfilebasename <- outfilebasename    
     }
-    filenames <- paste0(gsub("/$", "", outpath), "/mydoc_", outfilebasename, "_", filenumbers, ".md")
+    filenames <- paste0(gsub("/$", "", outpath), "/", filenameprefix, outfilebasename, "_", filenumbers, ".md")
     filenames <- gsub("/{1,}", "/", filenames)
     for(i in seq_along(mdlist)) {
         frontmatter <- c(starttag="---", 
@@ -176,12 +195,14 @@ md2Jekyll <- function(mdfile="Rbasics.knit.md", sidebartitle=NULL, sidebarpos, o
                          keywords="keywords: ", 
                          last_updated=paste0("last_updated: ", date()), 
                          sidebar="sidebar: mydoc_sidebar",          #sidebar can be set in _config.yml by folder
-                         permalink=paste0("permalink: /mydoc/mydoc_", outfilebasename, "_", filenumbers[i], "/"),  #emulates behavior of missing permalink
+                         permalink=paste0("permalink: /mydoc/", filenameprefix, outfilebasename, "_", filenumbers[i], permalinkterminator),  #v5style emulates behavior of missing permalink
+                                                  # NOTE! removing the final "/" will change the folder structure and file names
+                                                  #       so be sure to check the outpath parameter for images and next_button
                          endtag="---")
         if (i<length(mdlist)) {next_page <- i+1} else {next_page <- 1}
         endmatter <- c(tg_class='<div class="tags">',
                        tg_prompt="<b>Jump to: </b>",
-                       tg_href=paste0('<a href="/RDT5/mydoc/mydoc_', outfilebasename, "_", filenumbers[next_page], "/", '" class="btn btn-default navbar-btn cursorNorm" role="button">next_page</a>'),
+                       tg_href=paste0('<a href="', permalinknesting, "../mydoc/", filenameprefix, outfilebasename, "_", filenumbers[next_page], permalinkterminator, '" class="btn btn-default navbar-btn cursorNorm" role="button">next_page</a>'),
                        tg_endDiv="</div>")
         mdlist[[i]] <- c(as.character(frontmatter), mdlist[[i]][-1], as.character(endmatter))
     }
@@ -204,7 +225,7 @@ md2Jekyll <- function(mdfile="Rbasics.knit.md", sidebartitle=NULL, sidebarpos, o
             splitdist <- c(splitpos, length(sb)+1) - c(1, splitpos) 
             sblist <- split(sb, factor(rep(c(1, splitpos), splitdist)))
             mynames <- gsub("^.*title: {1,}", "", sb[splitpos])
-            mynames <- gsub(" {1,}", "_", mynames)
+#            mynames <- gsub(" {1,}", "_", mynames)             # GDM commented to fix sidebartitles problem
             names(sblist) <- c("header", mynames)
             return(sblist)
         } else {
@@ -229,9 +250,9 @@ md2Jekyll <- function(mdfile="Rbasics.knit.md", sidebartitle=NULL, sidebarpos, o
     mytitles <- gsub("# {1,}", "", titles)
     mytitles <- paste0(1:length(mytitles), ". ", mytitles)
 #    myurls <- paste0("/mydoc/", basename(filenames))
-#    myurls <- gsub(".md$", "/", myurls)		#add / or .html on end of permalink
+#    myurls <- gsub(".md$", permalinkterminator, myurls)		#add / or .html on end of permalink
     myurls <- paste0("/mydoc/", basename(filenames))          #permalink format for sidebar
-    myurls <- gsub(".md$", "/", myurls)
+    myurls <- gsub(".md$", permalinkterminator, myurls)
     sectionheader <- c(paste0("  - title: ", sidebartitle),
                        # "    audience: writers, designers",
                        # "    platform: all",
@@ -476,7 +497,7 @@ renderBib <- function(x, bibtex="bibtex.bib") {
 
 ## Run from command-line with arguments
 ###myargs <- commandArgs()
-###md2Jekyll(mdfile=myargs[6], sidebartitle=NULL, sidebarpos=as.numeric(myargs[7]), outfilebasename=NULL, outpath="../../mydoc", sidebar_url_path="../../_data/sidebars/", fenced2highlight=TRUE, image_dir=NULL)
+###md2Jekyll(mdfile=myargs[6], sidebartitle=NULL, sidebarpos=as.numeric(myargs[7]), outfilebasename=NULL, outpath="../../mydoc/", sidebar_url_path="../../_data/sidebars/", fenced2highlight=TRUE, image_dir=NULL)
 # $ Rscript ../md2jekyll.R bioassayR.knit.md 8
 
 # setwd("01_Overview")
